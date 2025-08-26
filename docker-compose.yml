@@ -1,0 +1,98 @@
+# docker-compose.yml (KRaft Mode, 3 Brokers)
+
+services:
+  # 1. Redis: 변경 없음
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning 
+    # 60초 동안 1개 이상의 키가 변경되면, 현재 메모리의 모든 데이터를 디스크에 저장 - 데이터 유실 방지
+    # debug(가장 상세) - verbose - notice(기본값) - warning(경고 이상)
+
+  # 2. Kafka Cluster (KRaft Mode)
+  kafka1:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka1
+    hostname: kafka1
+    ports:
+      - "9094:9094" # 브로커1 외부 접속 포트
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller' # 브로커와 컨트롤러 역할을 모두 수행
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093' # 컨트롤러 투표 참여 노드 목록
+      KAFKA_LISTENERS: 'INTER://kafka1:9092,CONTROLLER://kafka1:9093,EXTERNAL://0.0.0.0:9094'
+      KAFKA_ADVERTISED_LISTENERS: 'INTER://kafka1:9092,EXTERNAL://localhost:9094'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,INTER:PLAINTEXT,EXTERNAL:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTER'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3 # 3개 브로커에 복제
+      CLUSTER_ID: '3LEyrBh5RLmcO6b8qeD7RA' # 여기에 생성한 클러스터 ID를 붙여넣으세요.
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka2
+    hostname: kafka2
+    ports:
+      - "9095:9095" # 브로커2 외부 접속 포트
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
+      KAFKA_LISTENERS: 'INTER://kafka2:9092,CONTROLLER://kafka2:9093,EXTERNAL://0.0.0.0:9095'
+      KAFKA_ADVERTISED_LISTENERS: 'INTER://kafka2:9092,EXTERNAL://localhost:9095'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,INTER:PLAINTEXT,EXTERNAL:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTER'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      CLUSTER_ID: '3LEyrBh5RLmcO6b8qeD7RA' # 여기에 생성한 클러스터 ID를 붙여넣으세요.
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka3
+    hostname: kafka3
+    ports:
+      - "9096:9096" # 브로커3 외부 접속 포트
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka1:9093,2@kafka2:9093,3@kafka3:9093'
+      KAFKA_LISTENERS: 'INTER://kafka3:9092,CONTROLLER://kafka3:9093,EXTERNAL://0.0.0.0:9096'
+      KAFKA_ADVERTISED_LISTENERS: 'INTER://kafka3:9092,EXTERNAL://localhost:9096'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,INTER:PLAINTEXT,EXTERNAL:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTER'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      CLUSTER_ID: '3LEyrBh5RLmcO6b8qeD7RA' # 여기에 생성한 클러스터 ID를 붙여넣으세요.
+
+  # 3. Flink Cluster: Kafka 클러스터에 의존하도록 수정
+  flink-jobmanager:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: flink-jobmanager
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    volumes:
+      - ./flink-jobs:/opt/flink/usrlib
+
+  flink-taskmanager:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+      - kafka1
+      - kafka2
+      - kafka3
+    command: taskmanager
+    # scale: 1
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    volumes:
+      - ./flink-jobs:/opt/flink/usrlib
