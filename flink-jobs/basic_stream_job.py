@@ -1,44 +1,44 @@
-# flink-jobs/basic_stream_job.py
-
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer
+from pyflink.common import WatermarkStrategy, Types
+from pyflink.datastream.connectors.kafka import KafkaSource, KafkaOffsetsInitializer
 from pyflink.datastream.formats.json import JsonRowDeserializationSchema
-from pyflink.common.typeinfo import Types
 
 def basic_streaming_job():
-    # 1. 스트림 실행 환경 설정
+    # 1. 실행 환경
     env = StreamExecutionEnvironment.get_execution_environment()
-    # Flink Kafka 커넥터 jar 파일 추가. docker-compose에서 마운트한 경로를 사용
-    env.add_jars("file:///opt/flink/usrlib/flink-sql-connector-kafka-3.1.0-1.18.jar")
+    env.set_parallelism(1)
 
-    # 2. 카프카 소스(Source) 정의
-    # 데이터가 흘러 들어오는 입구를 설정합니다.
-    kafka_source = FlinkKafkaConsumer(
-        topics='user-behavior',
-        deserialization_schema=JsonRowDeserializationSchema.builder()
-            .type_info(Types.ROW([
-                Types.STRING(),
-                Types.STRING(),
-                Types.STRING(),
-                Types.FLOAT(),
-                Types.STRING()
-            ])).build(),
-        properties={
-            'bootstrap.servers': 'kafka1:9092,kafka2:9092,kafka3:9092', # Docker 내부 네트워크에서 사용하는 주소
-            'group.id': 'flink-group-1'
-        }
-    )
+    # 필드 이름과 타입을 각각의 리스트로 정의
+    field_names = ['user_id', 'product_id', 'event_type', 'price', 'event_time']
+    field_types = [Types.STRING(), Types.STRING(), Types.STRING(), Types.FLOAT(), Types.STRING()]
+
+    # 2. Kafka Source 정의
+    deser = JsonRowDeserializationSchema.builder() \
+        .type_info(
+            # 핵심 수정사항: Types.ROW_NAMED에 이름 리스트와 타입 리스트를 전달
+            Types.ROW_NAMED(field_names, field_types)
+        ).build()
+
+    source = KafkaSource.builder() \
+        .set_bootstrap_servers("kafka1:9092,kafka2:9092,kafka3:9092") \
+        .set_topics("test") \
+        .set_group_id("flink-group-1") \
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest()) \
+        .set_value_only_deserializer(deser) \
+        .build()
 
     # 3. 데이터 스트림 생성
-    # 카프카 소스로부터 데이터를 읽어 스트림을 만듭니다.
-    data_stream = env.add_source(kafka_source, "Kafka Source")
+    data_stream = env.from_source(
+        source,
+        WatermarkStrategy.no_watermarks(),
+        "Kafka Source"
+    )
 
-    # 4. 데이터 처리 및 출력(Sink)
-    # 지금은 가장 간단한 처리인 '출력'을 합니다.
+    # 4. 처리 및 출력
     data_stream.print()
 
-    # 5. 작업 실행
+    # 5. 실행
     env.execute("Basic Kafka to Console Job")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     basic_streaming_job()

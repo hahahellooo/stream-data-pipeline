@@ -68,7 +68,7 @@ services:
 
   # 3. Flink Cluster: Kafka 클러스터에 의존하도록 수정
   flink-jobmanager:
-    image: flink:1.18.0-scala_2.12-java11
+    build: .
     container_name: flink-jobmanager
     depends_on:
       - kafka1
@@ -83,7 +83,7 @@ services:
       - ./flink-jobs:/opt/flink/usrlib
 
   flink-taskmanager:
-    image: flink:1.18.0-scala_2.12-java11
+    build: .
     container_name: flink-taskmanager
     depends_on:
       - flink-jobmanager

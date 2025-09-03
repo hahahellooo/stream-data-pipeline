@@ -22,7 +22,6 @@ def generate_log_entry():
 def create_dummy_data_file(filename="dummy_data.json", target_size_gb=10):
     """지정한 크기의 더미 데이터 파일을 생성하는 함수"""
     target_size_bytes = target_size_gb * 1024 * 1024 * 1024
-
     print(f"{target_size_gb}GB의 {filename} 생성 중...")
 
     with open(filename, 'w') as f:
@@ -37,4 +36,4 @@ def create_dummy_data_file(filename="dummy_data.json", target_size_gb=10):
     print(f"{os.path.getsize(filename) / (1024**3):.2f} GB의 {filename} 파일 생성 성공")
 
 if __name__ == "__main__":
-     create_dummy_data_file()
+     create_dummy_data_file("test_dummy_data.json",1)

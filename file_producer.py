@@ -10,8 +10,10 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-TOPIC_NAME = 'user-behavior'
-FILE_PATH = 'dummy_data.json'
+# TOPIC_NAME = 'user-behavior'
+# FILE_PATH = 'dummy_data.json'
+TOPIC_NAME = 'test'
+FILE_PATH = 'test_dummy_data.json'
 
 def send_data_from_file(filename):
     """파일을 읽어 카프카로 전송하는 함수"""
